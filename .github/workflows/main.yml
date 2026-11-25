@@ -1,0 +1,85 @@
+
+name: JARVIS Android CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Gradle Configuration
+        run: gradle --no-daemon projects
+
+      - name: Manifest Check
+        run: gradle --no-daemon :app:processDebugMainManifest
+
+      - name: Kotlin Compilation
+        run: gradle --no-daemon :app:compileDebugKotlin
+
+      - name: Unit Tests
+        run: gradle --no-daemon :app:testDebugUnitTest
+
+      - name: Android Lint
+        run: gradle --no-daemon :app:lintDebug
+
+      - name: Build APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: JARVIS-APK
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: JARVIS-Reports
+          path: app/build/reports/
+          if-no-files-found: ignore
+
+  firebase-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firebase-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install --no-audit --no-fund
+
+      - run: npm test
+      
